@@ -307,7 +307,6 @@ def play():
         cn.append(tkinter.Label(master = fn2, image = ''))
         cn[i].grid(row = 0, column = i)
 
-
     fw = tkinter.Frame(master = playUI)
     fw.pack(side = tkinter.LEFT)
     fw1 = tkinter.Frame(master = fw)
@@ -327,8 +326,6 @@ def play():
         cw.append(tkinter.Label(master = fw2, image = ''))
         cw[i].grid(row = 0, column = i)
 
-
-
     fe = tkinter.Frame(master = playUI)
     fe.pack(side = tkinter.RIGHT)
     fe1 = tkinter.Frame(master = fe)
@@ -347,8 +344,6 @@ def play():
     for i in range(5):
         ce.append(tkinter.Label(master = fe2, image = ''))
         ce[i].grid(row = 0, column = i)
-
-
 
     fs = tkinter.Frame(master = playUI)
     fs.pack(side = tkinter.BOTTOM)
@@ -393,10 +388,6 @@ def play():
     bs_disc.grid(row = 0, column = 0, padx = 10)
     bs_pass = tkinter.Button(master = fs3, text = 'pass', command = pas)
     bs_pass.grid(row = 0, column = 1, padx = 20)
-
-    #test
-    show_cards()
-
 
 root = tkinter.Tk()
 l_ip = tkinter.Label(root, text = 'IP:')
@@ -473,7 +464,6 @@ photo.append(tkinter.PhotoImage(file = J2_img))
 photo_str = []
 for i in photo:
     photo_str.append(str(i))
-
 
 ########################################Logic###################################
 
@@ -609,8 +599,8 @@ def check(prev_cards, play_cards):
 ip = ''
 port = ''
 name = ''
-information = '3 0 5 8 14 17'
-prev_info = '3 0 5 8 14 17'
+information = ''
+prev_info = ''
 answer = ''
 
 ########################################Main####################################
