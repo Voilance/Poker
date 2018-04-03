@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 import socket
+import threading
 
 #  设置扑克牌路径
 img_path = os.curdir + os.sep + 'image' + os.sep
@@ -280,6 +281,19 @@ def check(prev_cards, play_cards):
     else:
         return False
 
+def self_check(play_cards):
+    play_c = play_cards.split()
+    if (len(play_c) == 1):
+        return True
+    elif (len(play_c) == 2):
+        return False if two(play_c)[0] == -1 else True
+    elif (len(play_c) == 3):
+        return False if three(play_c)[0] == -1 else True
+    elif (len(play_c) == 5):
+        return False if type_of_five(play_c)[0] == -1 else True
+    else:
+        return False
+
 ################################################################################
 ##  Socket网络数据交互及协议
 ##  ip:string，服务器的IP地址
@@ -293,8 +307,8 @@ def check(prev_cards, play_cards):
 ##  1~4: 表示对应id的玩家的出牌情况，在该客户端显示出来
 ##  5  : 发牌
 ################################################################################  
-ip          = ''
-port        = ''
+ip          = '110.64.87.213'
+port        = 2333
 name        = ''
 information = ''
 prev_info   = ''
@@ -307,12 +321,13 @@ soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 ################################################################################
 def login():
     global ip, port, name, soc
-    ip   = str(e_ip.get())
-    port = str(e_port.get())
+    # ip   = str(e_ip.get())
+    # port = int(e_port.get())
     name = str(e_name.get())
-    r = soc.connect((ip, port))
+    r = soc.connect_ex((ip, port))
     if (r == 0):
         l_msg['text'] = 'Success!'
+        soc.send(name.encode('utf-8'))
         play()
     else:
         l_msg['text'] = 'Fail'
@@ -326,12 +341,27 @@ def play():
 
     #  初始化各个玩家信息
     def initialize():
-        global information, player_name, player_id, name
+        global information, player_name, player_id, player_score, name
         info_list = information.split()
+        print(information)
+        print(len(info_list))
         for i in range(4):
             player_name[i] = info_list[i + 1]
+        print(info_list)
         player_id = info_list.index(name)
         player_score = [100, 100, 100, 100]
+        ls_score['text'] = '分数:100'
+        le_score['text'] = '分数:100'
+        lw_score['text'] = '分数:100'
+        ln_score['text'] = '分数:100'
+        ls_name['text'] = player_name[player_id - 1]
+        le_name['text'] = player_name[(player_id + 1) % 4 - 1]
+        ln_name['text'] = player_name[(player_id + 2) % 4 - 1]
+        lw_name['text'] = player_name[(player_id + 3) % 4 - 1]
+        ls_name['text'] = '手牌数:13'
+        le_name['text'] = '手牌数:13'
+        ln_name['text'] = '手牌数:13'
+        lw_name['text'] = '手牌数:13'
 
     def get_cards():
         global information, player_cards, player_cards_num
@@ -340,14 +370,44 @@ def play():
         for i in range(13):
             player_cards.append(int(info_list[i + 1]))
         player_cards_num = [13, 13, 13, 13]
+        reflash()
+        to_wait()
+
+    def to_disc():
+        for i in range(len(player_cards)):
+            bs[i]['bg'] = 'blue'
+        bs_disc['bg'] = 'green'
+        bs_disc['text'] = '出牌'
+        bs_pass['bg'] = 'green'
+        bs_pass['text'] = '不出'
+
+    def to_wait():
+        for i in range(len(player_cards)):
+            bs[i]['bg'] = 'white'
+        bs_disc['bg'] = 'white'
+        bs_disc['text'] = ''
+        bs_pass['bg'] = 'white'
+        bs_pass['text'] = ''
 
     #  出牌函数
     def discard():
-        global prev_info, answer, cards_selected, play_id
+        if bs_disc['bg'] == 'white':
+            return
+        global prev_info, answer, cards_selected, play_id, soc
         info_list = prev_info.split()
         info_id = (int(info_list[0]) + 4 - player_id) % 4
         if (info_id == player_id):
-            pass
+            cards_selected.sort()
+            play_cards = ''
+            for j in range(len(cards_selected)):
+                play_cards += (str(cards_selected[j]) + ' ')
+            if (self_check(play_cards)):
+                answer = str(player_id) + ' ' + play_cards
+                ls_pass['bg'] = 'white'
+                ls_pass['text'] = ''
+                reflash()
+                soc.send(answer.encode('utf-8'))
+            clear()
         else:
             prev_cards = ''
             for i in range(1, len(info_list)):
@@ -361,8 +421,9 @@ def play():
                 ls_pass['bg'] = 'white'
                 ls_pass['text'] = ''
                 reflash()
-                #  发送answer给服务端
+                soc.send(answer.encode('utf-8'))
             clear()
+        to_wait()
         
     #  不出牌函数
     def pas():
@@ -371,7 +432,8 @@ def play():
         ls_pass['bg'] = 'red'
         ls_pass['text'] = 'pass'
         answer = str(player_id) + ' -1'
-        #  发送answer给服务端 
+        to_wait()
+        soc.send(answer.encode('utf-8'))
 
     def reflash():
         global player_cards, cards_selected, bs
@@ -395,7 +457,7 @@ def play():
     #  id(1~4) + card IDs(-1表示pass)
     #  如果某一方手牌打完了就统计分数
     def show():
-        global information, player_id
+        global information, prev_info, player_id
         global cn, cw, ce, cs
         info_list = information.split()
         info_len = len(info_list)
@@ -405,6 +467,7 @@ def play():
                 ls_pass['bg'] = 'red'
                 ls_pass['text'] = 'Pass'
             else:
+                prev_info = information
                 ls_pass['bg'] = 'white'
                 ls_pass['text'] = ''
                 player_cards_num[info_id] -= (info_len - 1)
@@ -418,6 +481,7 @@ def play():
                 le_pass['bg'] = 'red'
                 le_pass['text'] = 'Pass'
             else:
+                prev_info = information
                 le_pass['bg'] = 'white'
                 le_pass['text'] = ''
                 player_cards_num[info_id] -= (info_len - 1)
@@ -431,6 +495,7 @@ def play():
                 ln_pass['bg'] = 'red'
                 ln_pass['text'] = 'Pass'
             else:
+                prev_info = information
                 ln_pass['bg'] = 'white'
                 ln_pass['text'] = ''
                 player_cards_num[info_id] -= (info_len - 1)
@@ -444,6 +509,7 @@ def play():
                 lw_pass['bg'] = 'red'
                 lw_pass['text'] = 'Pass'
             else:
+                prev_info = information
                 lw_pass['bg'] = 'white'
                 lw_pass['text'] = ''
                 player_cards_num[info_id] -= (info_len - 1)
@@ -452,6 +518,7 @@ def play():
                     i['image'] = ''
                 for j in range(1, info_len):
                     cw[j - 1]['image'] = p[int(info_list[j])]
+            to_disc()
         else:
             pass
         if (0 in player_cards_num):
@@ -480,16 +547,16 @@ def play():
     fn1.pack(pady = 5)
     fn2 = tk.Frame(master = fn)
     fn2.pack(pady = 5)
-    ln_name = tk.Label(master = fn1, text = 'N')
+    ln_name = tk.Label(master = fn1, text = '')
     ln_name.grid(row = 0, column = 0, padx = 5)
-    ln_num = tk.Label(master = fn1, text = '手牌:13')
+    ln_num = tk.Label(master = fn1, text = '手牌:0')
     ln_num.grid(row =0, column = 1, padx = 5)
-    ln_score = tk.Label(master = fn1, text = '分数:100')
+    ln_score = tk.Label(master = fn1, text = '分数:0')
     ln_score.grid(row = 0, column = 2, padx = 5)
     ln_pass = tk.Label(master = fn1, bg = 'white', text = '')
     ln_pass.grid(row = 0, column = 3, padx = 5)
     for i in range(5):
-        cn.append(tk.Label(master = fn2, image = p[45]))
+        cn.append(tk.Label(master = fn2, image = ''))
         cn[i].grid(row = 0, column = i)
 
     #  上家布局
@@ -499,16 +566,16 @@ def play():
     fw1.pack(pady = 5)
     fw2 = tk.Frame(master = fw)
     fw2.pack(pady = 5)
-    lw_name = tk.Label(master = fw1, text = 'W')
+    lw_name = tk.Label(master = fw1, text = '')
     lw_name.grid(row = 0, column = 0, padx = 5)
-    lw_num = tk.Label(master = fw1, text = '手牌:13')
+    lw_num = tk.Label(master = fw1, text = '手牌:0')
     lw_num.grid(row = 0, column = 1, padx = 5)
-    lw_score = tk.Label(master = fw1, text = '分数:100')
+    lw_score = tk.Label(master = fw1, text = '分数:0')
     lw_score.grid(row = 0, column = 2, padx = 5)
     lw_pass = tk.Label(master = fw1, bg = 'white', text = '')
     lw_pass.grid(row = 0, column = 3, padx = 5)
     for i in range(5):
-        cw.append(tk.Label(master = fw2, image = p[46]))
+        cw.append(tk.Label(master = fw2, image = ''))
         cw[i].grid(row = 0, column = i)
 
     #  下家布局
@@ -520,14 +587,14 @@ def play():
     fe2.pack(pady = 5)
     le_pass = tk.Label(master = fe1, bg = 'white', text = '')
     le_pass.grid(row = 0, column = 0, padx = 5)
-    le_name = tk.Label(master = fe1, text = 'E')
+    le_name = tk.Label(master = fe1, text = '')
     le_name.grid(row = 0, column = 1, padx = 5)
-    le_num = tk.Label(master = fe1, text = '手牌:13')
+    le_num = tk.Label(master = fe1, text = '手牌:0')
     le_num.grid(row = 0, column = 2, padx = 5)
-    le_score = tk.Label(master = fe1, text = '分数:100')
+    le_score = tk.Label(master = fe1, text = '分数:0')
     le_score.grid(row = 0, column = 3, padx = 5)
     for i in range(5):
-        ce.append(tk.Label(master = fe2, image = p[44]))
+        ce.append(tk.Label(master = fe2, image = ''))
         ce[i].grid(row = 0, column = i)
 
     #  自己布局
@@ -542,18 +609,18 @@ def play():
     fs3 = tk.Frame(master = fs)
     fs3.pack(pady = 5)
     for i in range(5):
-        cs.append(tk.Label(master = fs0, image = p[47]))
+        cs.append(tk.Label(master = fs0, image = ''))
         cs[i].grid(row = 0, column = i)
-    ls_name = tk.Label(master = fs1, text = 'S')
+    ls_name = tk.Label(master = fs1, text = '')
     ls_name.grid(row = 0, column = 0, padx = 5)
-    ls_num = tk.Label(master = fs1, text = '手牌:13')
+    ls_num = tk.Label(master = fs1, text = '手牌:0')
     ls_num.grid(row = 0, column = 1, padx = 5)
-    ls_score = tk.Label(master = fs1, text = '分数:100')
+    ls_score = tk.Label(master = fs1, text = '分数:0')
     ls_score.grid(row = 0, column = 2, padx = 5)
     ls_pass = tk.Label(master = fs1, bg = 'white', text = '')
     ls_pass.grid(row = 0, column = 3, padx = 5)
     for i in range(13):
-        bs.append(tk.Button(master = fs2, bg = 'blue', image = ''))
+        bs.append(tk.Button(master = fs2, bg = 'white', image = ''))
         bs[i].grid(row = 0, column = i)
     bs[0]['command']  = lambda : button_responed(bs[0])
     bs[1]['command']  = lambda : button_responed(bs[1])
@@ -568,21 +635,28 @@ def play():
     bs[10]['command'] = lambda : button_responed(bs[10])
     bs[11]['command'] = lambda : button_responed(bs[11])
     bs[12]['command'] = lambda : button_responed(bs[12])
-    bs_disc = tk.Button(master = fs3, text = '出牌', command = discard)
+    bs_disc = tk.Button(master = fs3, bg = 'white', text = '', command = discard)
     bs_disc.grid(row = 0, column = 0, padx = 20)
-    bs_pass = tk.Button(master = fs3, text = '不出', command = pas)
+    bs_pass = tk.Button(master = fs3, bg = 'white', text = '', command = pas)
     bs_pass.grid(row = 0, column = 1, padx = 20)
 
-    while (True):
-        information = soc.recv(1024)
-        info_list = information.split()
-        info_id = int(info_list[0])
-        if (info_id == 0):
-            initialize()
-        elif (1 <= info_id <= 4):
-            show()
-        elif (info_id == 5):
-            get_cards()
+    def listen():
+        global information
+        while True:
+            information = soc.recv(1024).decode('utf-8')
+            print(information)
+            info_list = information.split()
+            info_id = int(info_list[0])
+            if (info_id == 0):
+                initialize()
+            elif (1 <= info_id <= 4):
+                show()
+            elif (info_id == 5):
+                get_cards()
+
+    net_t = threading.Thread(target = listen)
+    net_t.start()
+
 
 def button_responed(btn):
     global cards_selected
