@@ -307,8 +307,8 @@ def self_check(play_cards):
 ##  1~4: 表示对应id的玩家的出牌情况，在该客户端显示出来
 ##  5  : 发牌
 ################################################################################  
-ip          = '110.64.87.213'
-port        = 2333
+ip          = ''
+port        = 0
 name        = ''
 information = ''
 prev_info   = ''
@@ -321,8 +321,8 @@ soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 ################################################################################
 def login():
     global ip, port, name, soc
-    # ip   = str(e_ip.get())
-    # port = int(e_port.get())
+    ip   = str(e_ip.get())
+    port = int(e_port.get())
     name = str(e_name.get())
     r = soc.connect_ex((ip, port))
     if (r == 0):
@@ -343,12 +343,11 @@ def play():
     def initialize():
         global information, player_name, player_id, player_score, name
         info_list = information.split()
-        print(information)
-        print(len(info_list))
         for i in range(4):
             player_name[i] = info_list[i + 1]
-        print(info_list)
         player_id = info_list.index(name)
+        if player_id == 4:
+            soc.send('0'.encode('utf-8'))
         player_score = [100, 100, 100, 100]
         ls_score['text'] = '分数:100'
         le_score['text'] = '分数:100'
@@ -358,20 +357,24 @@ def play():
         le_name['text'] = player_name[(player_id + 1) % 4 - 1]
         ln_name['text'] = player_name[(player_id + 2) % 4 - 1]
         lw_name['text'] = player_name[(player_id + 3) % 4 - 1]
-        ls_name['text'] = '手牌数:13'
-        le_name['text'] = '手牌数:13'
-        ln_name['text'] = '手牌数:13'
-        lw_name['text'] = '手牌数:13'
+        ls_num['text'] = '手牌数:13'
+        le_num['text'] = '手牌数:13'
+        ln_num['text'] = '手牌数:13'
+        lw_num['text'] = '手牌数:13'
 
     def get_cards():
-        global information, player_cards, player_cards_num
+        global information, player_cards, player_cards_num, prev_info, player_id
         info_list = information.split()
         player_cards = []
         for i in range(13):
             player_cards.append(int(info_list[i + 1]))
         player_cards_num = [13, 13, 13, 13]
+        player_cards.sort()
         reflash()
         to_wait()
+        if 0 in player_cards:
+            to_disc()
+            prev_info = str(player_id)
 
     def to_disc():
         for i in range(len(player_cards)):
@@ -393,22 +396,31 @@ def play():
     def discard():
         if bs_disc['bg'] == 'white':
             return
-        global prev_info, answer, cards_selected, play_id, soc
+        global prev_info, answer, cards_selected, player_id, soc
+        print(cards_selected)
         info_list = prev_info.split()
-        info_id = (int(info_list[0]) + 4 - player_id) % 4
+        info_id = int(info_list[0])
+        print(info_id, player_id)
         if (info_id == player_id):
+            print('info_id == player_id')
             cards_selected.sort()
             play_cards = ''
             for j in range(len(cards_selected)):
                 play_cards += (str(cards_selected[j]) + ' ')
+            print(self_check(play_cards))
             if (self_check(play_cards)):
                 answer = str(player_id) + ' ' + play_cards
                 ls_pass['bg'] = 'white'
                 ls_pass['text'] = ''
                 reflash()
+                print(answer)
                 soc.send(answer.encode('utf-8'))
-            clear()
+                clear()
+            else:
+                clear()
+                return
         else:
+            print('info_id != play_id')
             prev_cards = ''
             for i in range(1, len(info_list)):
                 prev_cards += (str(info_list[i]) + ' ')
@@ -422,13 +434,20 @@ def play():
                 ls_pass['text'] = ''
                 reflash()
                 soc.send(answer.encode('utf-8'))
-            clear()
+                clear()
+            else:
+                clear()
+                return
         to_wait()
         
     #  不出牌函数
     def pas():
-        global answer
+        global answer, prev_info
         clear()
+        if (player_id == int(prev_info[0])):
+            return
+        if (0 in player_cards):
+            return
         ls_pass['bg'] = 'red'
         ls_pass['text'] = 'pass'
         answer = str(player_id) + ' -1'
@@ -466,6 +485,8 @@ def play():
             if (int(info_list[1]) == -1):
                 ls_pass['bg'] = 'red'
                 ls_pass['text'] = 'Pass'
+                for i in cs:
+                    i['image'] = ''
             else:
                 prev_info = information
                 ls_pass['bg'] = 'white'
@@ -480,6 +501,8 @@ def play():
             if (int(info_list[1]) == -1):
                 le_pass['bg'] = 'red'
                 le_pass['text'] = 'Pass'
+                for i in ce:
+                    i['image'] = ''
             else:
                 prev_info = information
                 le_pass['bg'] = 'white'
@@ -494,6 +517,8 @@ def play():
             if (int(info_list[1]) == -1):
                 ln_pass['bg'] = 'red'
                 ln_pass['text'] = 'Pass'
+                for i in cn:
+                    i['image'] = ''
             else:
                 prev_info = information
                 ln_pass['bg'] = 'white'
@@ -508,6 +533,8 @@ def play():
             if (int(info_list[1]) == -1):
                 lw_pass['bg'] = 'red'
                 lw_pass['text'] = 'Pass'
+                for i in cw:
+                    i['image'] = ''
             else:
                 prev_info = information
                 lw_pass['bg'] = 'white'

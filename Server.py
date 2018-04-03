@@ -25,10 +25,10 @@ def gen_deck():
 
 ################################################################################
 
-# host = input('please input host:')
-# port = input('please input port:')
-host = '110.64.87.213'
-port = 2333
+host = input('please input host:')
+port = input('please input port:')
+# host = '110.64.87.213'
+# port = 2333
 soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 soc.bind((host, int(port)))
 soc.listen(4)
@@ -75,6 +75,8 @@ def Main():
         j[0].send(all_name.encode('utf-8'))
     print(all_name)
 
+    ans = conn[3][0].recv(1024).decode('utf-8')
+
     playing = True
     while playing:
         gen_deck()
@@ -89,6 +91,7 @@ def Main():
         print(c1, c2, c3, c4)
         player_cards_num = [13, 13, 13, 13]
         id = frist_player()
+        print('frist player id:' + str(id))
         while True:
             info = conn[id - 1][0].recv(1024).decode('utf-8')
             conn[0][0].send(info.encode('utf-8'))
